@@ -59,7 +59,7 @@ G[1]
 G[1][1][1:10]
 G[2][1:10]
 
-# Dataframes
+## Dataframes
 D = DataFrame(G...)  #Equivalent to DataFrame(G[1]G[2])
 
 # Summary of the sizes of the data frame
@@ -216,7 +216,7 @@ how_many_per_year_3(P_dictionary, year::Int64)= length(P_dictionary[year])
 
 how_many_per_year_3(P_dictionary, 2011)
 
-# Linear Algebra module
+## Linear Algebra module
 
 # Load Packages
 using LinearAlgebra
@@ -362,7 +362,7 @@ Gray.(reshape(A*X,192,168))
 
 norm(A*X-b)
 
-# Module on Statistics
+## Module on Statistics
 
 using Statistics
 using StatsBase
@@ -525,3 +525,74 @@ pred = [1, 1, 0, 0, 1, 1, 1, 1]; # prediction
 ROC = roc(gt, pred) #from MLBase package
 recall(ROC)
 precision(ROC)
+
+## Dimensionality Reduction
+using XLSX
+using VegaDatasets
+using MultivariateStats
+using RDatasets
+using StatsBase
+using Statistics
+using LinearAlgebra
+using Plots
+using ScikitLearn
+using Makie
+using MLBase
+using UMAP
+using Distances
+
+c = DataFrame(VegaDatasets.dataset("cars"))
+
+dropmissing!(c)
+M = Matrix(c[:,2:7])
+names(c)
+
+car_origin = c[:, :Origin]
+carmap = labelmap(car_origin) #from MLBase
+uniqueids = labelencode(carmap, car_origin)
+# PCA
+# Center and normalize data
+data = M;
+data = (data .- mean(data, dims = 1))./ std(data, dims = 1)
+
+p = fit(PCA, data', maxoutdim = 2) #from MultivariateStats
+P = projection(p) # projection matrix
+
+Yte = MultivariateStats.transform(p, data') #aplies projection matrix to each car
+Xr = reconstruct(p, Yte) #reconstruct testing observations - approximately
+norm(Xr-data')
+
+#base plot
+Plots.scatter(Yte[1,:], Yte[2,:])
+
+#labelled Plot
+Plots.scatter(Yte[1,car_origin.== "USA"], Yte[2,car_origin.== "USA"], color = 1, label = "USA");
+Plots.xlabel!("pca component 1");
+Plots.ylabel!("pca component 2");
+Plots.scatter!(Yte[1,car_origin.== "Japan"], Yte[2,car_origin.== "Japan"], color = 2, label = "Japan");
+Plots.scatter!(Yte[1,car_origin.== "Europe"], Yte[2,car_origin.== "Europe"], color = 3, label = "Europe")
+
+# 3d Reduction with 3d scatter
+p = fit(PCA, data', maxoutdim = 3);
+Yte = MultivariateStats.transform(p, data');
+scatter3d(Yte[1,:],Yte[2,:],Yte[3,:],color= uniqueids, legend = false)
+
+scene = Makie.scatter(Yte[1,:],Yte[2,:],Yte[3,:],color= uniqueids);
+display(scene)
+
+## t-SNE
+@sk_import manifold : TSNE;
+tfn = TSNE(n_components = 2); # ,perplexity=20.0, early_exaggeration = 50)
+Y2 = tfn.fit_transform(data);
+Plots.scatter(Y2[:,1],Y2[:,2], color = uniqueids, legend = false, size = (400,300), markersize = 3)
+
+## UMAP
+L = cor(data, data, dims =2); #each element is correlation between 2 cars
+embedding = umap(L, 2)
+Plots.scatter(embedding[1,:], embedding[2,:], color = uniqueids)
+
+L2 = pairwise(Euclidean(), data, data, dims = 1);
+embedding2 = umap(-L2, 2);
+Plots.scatter(embedding2[1,:],embedding2[2,:], color = uniqueids)
+
+#Interesting finding: for sure 2 clusters mostly US, one cluster US, Japan, Europe
